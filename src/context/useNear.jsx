@@ -1,27 +1,23 @@
-import { useContext } from "react";
-import { createContext } from "react";
+import { useContext, createContext } from 'react'
 
 /**
- * @typedef NearContext
- * @property {import('./wallets/near').Wallet} wallet Current wallet
- * @property {string} signedId The email of the signed user
+ * @typedef {Object} NearContext
+ * @property {import('@near-js/accounts').Account | null} nearAccount The NEAR account instance
  * @property {string} walletId The user's NEAR wallet address
+ * @property {import('@near-js/providers').JsonRpcProvider} provider A NEAR JSON RPC provider
  */
 
-/** @type {import ('react').Context<NearContext>} */
+/** @type {import('react').Context<NearContext>} */
 export const NearContext = createContext({
   walletId: '',
-  viewMethod: async () => { },
-  callMethod: async () => { },
-  getBalance: async () => { },
-});
+  nearAccount: null,
+  provider: undefined,
+})
 
 export function useNEAR() {
-  const context = useContext(NearContext);
+  const context = useContext(NearContext)
   if (!context) {
-    throw new Error(
-      "useNEAR must be used within a <NEARxPrivy> provider"
-    );
+    throw new Error('useNEAR must be used within a <NEARxPrivy> provider')
   }
-  return context;
+  return context
 }

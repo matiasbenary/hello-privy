@@ -1,51 +1,58 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react'
 
-import { Cards } from '@/components/cards';
-import styles from '@/styles/app.module.css';
+import { Cards } from '@/components/cards'
+import styles from '@/styles/app.module.css'
 
-import { HelloNearContract } from '@/config';
-import { useNEAR } from '../context/useNear';
-import { usePrivy } from '@privy-io/react-auth';
+import { HelloNearContract } from '@/config'
+import { useNEAR } from '../context/useNear'
+import { usePrivy } from '@privy-io/react-auth'
+import { useCallback } from 'react'
 
 // Contract that the app will interact with
-const CONTRACT = HelloNearContract;
+const CONTRACT = HelloNearContract
 
 export default function HelloNear() {
+  const [greeting, setGreeting] = useState('loading...')
+  const [newGreeting, setNewGreeting] = useState('loading...')
+  const [loggedIn, setLoggedIn] = useState(false)
+  const [showSpinner, setShowSpinner] = useState(false)
 
-  const [greeting, setGreeting] = useState('loading...');
-  const [newGreeting, setNewGreeting] = useState('loading...');
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [showSpinner, setShowSpinner] = useState(false);
+  const { authenticated } = usePrivy()
+  const { provider, nearAccount } = useNEAR()
 
-  const { authenticated } = usePrivy();
-  const { viewFunction, callFunction } = useNEAR();
-
-  const fetchGreeting = async () => {
-    const greeting = await viewFunction({ contractId: CONTRACT, method: 'get_greeting' });
-    setGreeting(greeting);
-  };
+  const fetchGreeting = useCallback(async () => {
+    const greeting = await provider.callFunction(CONTRACT, 'get_greeting', {})
+    setGreeting(greeting)
+  }, [provider])
 
   const saveGreeting = async () => {
-    callFunction({ contractId: CONTRACT, method: 'set_greeting', args: { greeting: newGreeting } })
-      .catch(e => {
-        alert(`Error, did you deposit any NEAR Ⓝ? You can get some at https://dev.near.org/faucet`);
-        console.log(`Error saving greeting: ${e.message}`);
-        fetchGreeting();
-      });
+    nearAccount
+      .callFunction({
+        contractId: CONTRACT,
+        methodName: 'set_greeting',
+        args: { greeting: newGreeting },
+      })
+      .catch((e) => {
+        alert(
+          `Error, did you deposit any NEAR Ⓝ? You can get some at https://dev.near.org/faucet`
+        )
+        console.log(`Error saving greeting: ${e.message}`)
+        fetchGreeting()
+      })
 
-    setShowSpinner(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    setGreeting(newGreeting);
-    setShowSpinner(false);
-  };
+    setShowSpinner(true)
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    setGreeting(newGreeting)
+    setShowSpinner(false)
+  }
 
   useEffect(() => {
-    setLoggedIn(!!authenticated);
-  }, [authenticated]);
+    setLoggedIn(!!authenticated)
+  }, [authenticated])
 
   useEffect(() => {
-    fetchGreeting();
-  }, []);
+    fetchGreeting()
+  }, [fetchGreeting])
 
   return (
     <main className={styles.main}>
@@ -70,7 +77,10 @@ export default function HelloNear() {
           <div className="input-group-append">
             <button className="btn btn-secondary" onClick={saveGreeting}>
               <span hidden={showSpinner}> Save </span>
-              <i className="spinner-border spinner-border-sm" hidden={!showSpinner}></i>
+              <i
+                className="spinner-border spinner-border-sm"
+                hidden={!showSpinner}
+              ></i>
             </button>
           </div>
         </div>
@@ -80,5 +90,5 @@ export default function HelloNear() {
       </div>
       <Cards />
     </main>
-  );
+  )
 }

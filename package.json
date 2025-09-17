@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint .",
+    "lint:fix": "eslint --fix src",
+    "prettier:fix": "prettier --write .",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -15,16 +16,12 @@
     "@near-js/transactions": "^2.2.5",
     "@noble/hashes": "^1.8.0",
     "@privy-io/react-auth": "^2.21.1",
-    "@reown/appkit": "^1.7.4",
-    "@reown/appkit-adapter-wagmi": "^1.7.4",
     "@scure/base": "^1.2.6",
-    "@wagmi/core": "^2.17.1",
     "bootstrap": "^5",
     "bootstrap-icons": "^1.11.3",
     "react": "^18",
     "react-dom": "^18",
-    "react-router": "^7",
-    "viem": "^2.33.3"
+    "react-router": "^7"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
@@ -36,6 +33,7 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.16",
     "globals": "^15.14.0",
+    "prettier": "^3.6.2",
     "vite": "^6.3.5",
     "vite-plugin-node-polyfills": "^0.24.0"
   }
