@@ -4,45 +4,42 @@ import NearLogo from '@/assets/near-logo.svg'
 import { Link } from 'react-router'
 import styles from '@/styles/app.module.css'
 
-import { useLogin, useLogout, usePrivy } from '@privy-io/react-auth'
 import { useNEAR } from '../context/useNear'
 import { NEAR } from '@near-js/tokens'
 
 export const Navigation = () => {
-  const [action, setAction] = useState(() => {})
-  const [label, setLabel] = useState('Loading...')
   const [balance, setBalance] = useState(0)
-  const { authenticated, user } = usePrivy()
-
-  const { login: privyLogin } = useLogin()
-  const { logout: privyLogout } = useLogout()
-
-  const { walletId, nearAccount } = useNEAR()
+  const { signedAccountId, nearAccount, signIn, signOut, loading, createKey,wallet } = useNEAR()
 
   useEffect(() => {
-    if (authenticated) {
-      const userId = user.google
-        ? user.google.email
-        : user.email
-          ? user.email.address
-          : user.github.username
-      setAction(() => privyLogout)
-      setLabel(`Logout ${userId}`)
-    } else {
-      setAction(() => privyLogin)
-      setLabel('Login')
-      setBalance(null)
-    }
-  }, [authenticated, privyLogin, privyLogout, user])
-
-  useEffect(() => {
-    if (walletId) {
+    if (nearAccount && signedAccountId) {
       nearAccount
         .getBalance()
         .then((b) => setBalance(Number(NEAR.toDecimal(b)).toFixed(2)))
-        .catch(() => setBalance(0)) // non existing account
+        .catch(() => setBalance(0))
+    } else {
+      setBalance(0)
     }
-  }, [walletId, nearAccount])
+  }, [signedAccountId, nearAccount])
+
+  const handleWalletConnect = () => {
+    if (signedAccountId) {
+      signOut()
+    } else {
+      signIn()
+    }
+  }
+
+  const handleCreateKey = async () => {
+    try {
+      await wallet.pepe();
+      await createKey()
+      alert('Access key created successfully! You can now sign transactions without wallet popups.')
+    } catch (error) {
+      console.error('Error creating access key:', error)
+      alert(`Error: ${error.message}`)
+    }
+  }
 
   return (
     <>
@@ -57,18 +54,34 @@ export const Navigation = () => {
               className={styles.logo}
             />
           </Link>
-          <div className="navbar-nav pt-1">
-            {authenticated ? (
+          <div className="navbar-nav pt-1 gap-2">
+            {signedAccountId && (
               <span className="badge text-dark small">
-                {' '}
-                <br />
-                {walletId}: {balance} Ⓝ
+                {signedAccountId}: {balance} Ⓝ
               </span>
-            ) : null}
+            )}
 
-            <button className="btn btn-secondary" onClick={action}>
-              {label}
+            <button
+              className="btn btn-primary"
+              onClick={handleWalletConnect}
+              disabled={loading}
+            >
+              {loading
+                ? 'Loading...'
+                : signedAccountId
+                  ? 'Disconnect Wallet'
+                  : 'Connect Wallet'}
             </button>
+
+            {signedAccountId && (
+              <button
+                className="btn btn-success"
+                onClick={handleCreateKey}
+                disabled={loading}
+              >
+                Create Access Key
+              </button>
+            )}
           </div>
         </div>
       </nav>
