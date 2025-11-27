@@ -12,7 +12,6 @@ import { KeyPair } from "@near-js/crypto";
 import { KeyPairSigner } from "@near-js/signers";
 import { actionCreators } from "@near-js/transactions";
 import { NearConnector } from "@hot-labs/near-connect";
-
 export const NearContext = createContext(undefined);
 
 const RPC_URLS = {
@@ -20,59 +19,46 @@ const RPC_URLS = {
   mainnet: "https://rpc.fastnear.com",
 };
 
-const AccessKeyPlugin = (config, provider) => {
-  console.log("[AccessKeyPlugin] Initialized with config:", config);
-  
-  const STORAGE_KEY = `access_key_${config.contractId}`;
+// interface FunctionCallKey {
+//   privateKey: KeyPairString;
+//   contractId: string;
+//   allowedMethods: Array<string>;
+// }
+
+const AccessKeyPlugin = (wallet) => {
+  console.log("[AccessKeyPlugin] Initialized");
+
+  const STORAGE_KEY = `access_key::`;
 
   const shouldUseAccessKey = (tx) => {
-    if (tx.receiverId !== config.contractId || !localStorage.getItem(STORAGE_KEY)) {
+    if (!localStorage.getItem(STORAGE_KEY)) {
       return false;
     }
 
+    const key = JSON.parse(localStorage.getItem(STORAGE_KEY));
+
+    if (tx.receiverId == key.contractId) return false;
+
     for (const action of tx.actions) {
       if (action.type !== "FunctionCall") return false;
-      if (!config.allowedMethods.includes(action.params.methodName)) return false;
+      if (!key.allowedMethods.includes(action.params.methodName)) return false;
     }
 
     return true;
   };
 
-  const signTransactionLocally = async (tx) => {
-    const keyData = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-
-    const keyInfo = await provider.query({
-      request_type: "view_access_key",
-      account_id: keyData.accountId,
-      public_key: keyData.publicKey,
-      finality: "final",
-    });
-
-    const allowanceLeft = keyInfo.permission.FunctionCall.allowance;
-
-    if (allowanceLeft === "0") {
-      console.warn("[AccessKeyPlugin] Access key has no allowance left");
-      localStorage.removeItem(STORAGE_KEY);
-      throw new Error(
-        "Access key has no allowance left. Please sign in again."
-      );
-    }
+  const signTransactionLocally = async (tx, provider) => {
+    const keyData = JSON.parse(localStorage.getItem(STORAGE_KEY));
 
     const keyPair = KeyPair.fromString(keyData.privateKey);
-
     const signer = new KeyPairSigner(keyPair);
-
     const account = new Account(keyData.accountId, provider, signer);
 
     const actions = tx.actions.map((action) => {
       if (action.type === "FunctionCall") {
-        const argsBytes = new TextEncoder().encode(
-          JSON.stringify(action.params.args || {})
-        );
-
         return actionCreators.functionCall(
           action.params.methodName,
-          argsBytes,
+          action.params.args,
           BigInt(action.params.gas || "30000000000000"),
           BigInt(action.params.deposit || "0")
         );
@@ -93,13 +79,12 @@ const AccessKeyPlugin = (config, provider) => {
   };
 
   return {
-
-    async pepe(wallet,args,result){
+    ...wallet,
+    async pepe() {
       console.log("pepe plugin called");
-      return result(undefined);
     },
-    async createKey(wallet, args, result) {
-      console.log("[AccessKeyPlugin] createKey called with args:", args);
+    async createKey({ contractId, methodNames, allowance }) {
+      console.log("[AccessKeyPlugin] createKey called with args:", { contractId, methodNames });
 
       const walletAccounts = await wallet.getAccounts();
       const accountId = walletAccounts[0]?.accountId;
@@ -113,7 +98,7 @@ const AccessKeyPlugin = (config, provider) => {
       const privateKey = keyPair.toString();
 
       try {
-        await wallet.signAndSendTransaction({
+        const result = await wallet.signAndSendTransaction({
           receiverId: accountId,
           actions: [
             {
@@ -122,9 +107,9 @@ const AccessKeyPlugin = (config, provider) => {
                 publicKey: newPublicKey,
                 accessKey: {
                   permission: {
-                    receiverId: args.contractId,
-                    methodNames: args.methodNames || [],
-                    allowance: "250000000000000000000000",
+                    receiverId: contractId,
+                    methodNames: methodNames || [],
+                    allowance: allowance || "250000000000000000000000",
                   },
                 },
               },
@@ -135,38 +120,32 @@ const AccessKeyPlugin = (config, provider) => {
         localStorage.setItem(
           STORAGE_KEY,
           JSON.stringify({
-            accountId,
-            publicKey: newPublicKey,
             privateKey,
-            contractId: args.contractId,
-            allowedMethods: args.methodNames,
+            contractId: contractId,
+            allowedMethods: methodNames,
           })
         );
 
         console.log("[AccessKeyPlugin] Access key created successfully:", newPublicKey);
+        return result
       } catch (error) {
         console.error("[AccessKeyPlugin] Error creating access key:", error);
         throw error;
       }
-
-      return result(undefined);
     },
 
-    async signOut(_wallet, args, result, next) {
+    async signOut(args) {
       localStorage.removeItem(STORAGE_KEY);
-      await next(args);
-      return result(undefined);
+      return wallet.signOut(args);
     },
 
-    async signAndSendTransaction(_wallet, tx, result, next) {
-      console.log("[AccessKeyPlugin] signAndSendTransaction called with tx:", tx);
+    async signAndSendTransaction(tx) {
+      console.log("[AccessKeyPlugin] signAndSendTransaction called with tx:");
 
       if (shouldUseAccessKey(tx)) {
-        const outcome = await signTransactionLocally(tx);
-        return result(outcome);
+        return signTransactionLocally(tx);
       }
-      const outcome = await next(tx);
-      return result(outcome);
+      return wallet.signAndSendTransaction(tx);
     },
   };
 };
@@ -194,19 +173,10 @@ export function NearProvider({
       },
     });
 
-    conn.use(
-      AccessKeyPlugin(
-        {
-          contractId,
-          allowedMethods,
-        },
-        provider
-      )
-    );
-
+    conn.use(AccessKeyPlugin);
 
     return conn;
-  }, [network, contractId, allowedMethods, provider]);
+  }, [network]);
 
   useEffect(() => {
     async function initializeConnector() {
@@ -307,7 +277,7 @@ export function NearProvider({
       gas,
       deposit,
     });
-    
+
     try {
       return await wallet.signAndSendTransaction({
         signerId: signedAccountId,
