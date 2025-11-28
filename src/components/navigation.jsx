@@ -9,7 +9,7 @@ import { NEAR } from '@near-js/tokens'
 
 export const Navigation = () => {
   const [balance, setBalance] = useState(0)
-  const { signedAccountId, nearAccount, signIn, signOut, loading, createKey,wallet } = useNEAR()
+  const { signedAccountId, nearAccount, signIn, signOut, loading, createKey } = useNEAR()
 
   useEffect(() => {
     if (nearAccount && signedAccountId) {
@@ -32,7 +32,6 @@ export const Navigation = () => {
 
   const handleCreateKey = async () => {
     try {
-      await wallet.pepe();
       await createKey()
       alert('Access key created successfully! You can now sign transactions without wallet popups.')
     } catch (error) {
